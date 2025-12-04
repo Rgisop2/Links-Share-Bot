@@ -1,4 +1,3 @@
-
 import motor.motor_asyncio
 import base64
 from config import DB_URI, DB_NAME
@@ -118,6 +117,40 @@ async def save_channel(channel_id: int) -> bool:
     except Exception as e:
         print(f"Error saving channel {channel_id}: {e}")
         return False
+
+async def save_channel_photo(channel_id: int, photo_link: str) -> bool:
+    """Save photo link for a channel."""
+    if not isinstance(channel_id, int):
+        print(f"Invalid channel_id: {channel_id}")
+        return False
+    
+    try:
+        await channels_collection.update_one(
+            {"channel_id": channel_id},
+            {
+                "$set": {
+                    "photo_link": photo_link,
+                    "updated_at": datetime.utcnow()
+                }
+            },
+            upsert=True
+        )
+        return True
+    except Exception as e:
+        print(f"Error saving photo link for channel {channel_id}: {e}")
+        return False
+
+async def get_channel_photo(channel_id: int) -> Optional[str]:
+    """Get photo link for a channel."""
+    if not isinstance(channel_id, int):
+        return None
+    
+    try:
+        channel = await channels_collection.find_one({"channel_id": channel_id, "status": "active"})
+        return channel.get("photo_link") if channel else None
+    except Exception as e:
+        print(f"Error fetching photo link for channel {channel_id}: {e}")
+        return None
 
 async def get_channels() -> List[int]:
     """Get all active channel IDs from the database."""
