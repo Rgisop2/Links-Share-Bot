@@ -1,4 +1,3 @@
-
 import asyncio
 import base64
 import time
@@ -132,6 +131,9 @@ async def start_command(client: Bot, message: Message):
                     is_request_link = is_request
                     await save_invite_link(channel_id, invite_link, is_request_link)
 
+            from database.database import get_channel_photo
+            photo_link = await get_channel_photo(channel_id)
+            
             button_text = "• ʀᴇǫᴜᴇsᴛ ᴛᴏ ᴊᴏɪɴ •" if is_request_link else "• ᴊᴏɪɴ ᴄʜᴀɴɴᴇʟ •"
             button = InlineKeyboardMarkup([[InlineKeyboardButton(button_text, url=invite_link)]])
 
@@ -142,19 +144,66 @@ async def start_command(client: Bot, message: Message):
             
             await wait_msg.delete()
             
-            await message.reply_text(
-                "<b><blockquote expandable>ʜᴇʀᴇ ɪs ʏᴏᴜʀ ʟɪɴᴋ! ᴄʟɪᴄᴋ ʙᴇʟᴏᴡ ᴛᴏ ᴘʀᴏᴄᴇᴇᴅ</b>",
-                reply_markup=button,
-                parse_mode=ParseMode.HTML
-            )
+            if photo_link:
+                # Get channel info for title
+                try:
+                    chat = await client.get_chat(channel_id)
+                    channel_title = chat.title
+                    channel_username = f"@{chat.username}" if chat.username else ""
+                    
+                    # Remove "Hindi" from end of title if present
+                    if channel_title.endswith(" Hindi"):
+                        channel_title = channel_title[:-6].strip()
+                    
+                    # Calculate expiration time (10 minutes)
+                    expire_seconds = 600
+                    
+                    # Escape special characters for MarkdownV2
+                    def escape_markdown(text):
+                        special_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+                        for char in special_chars:
+                            text = text.replace(char, f'\\{char}')
+                        return text
+                    
+                    escaped_title = escape_markdown(channel_title)
+                    escaped_username = escape_markdown(channel_username)
+                    escaped_photo_link = photo_link  # URL doesn't need escaping in MarkdownV2
+                    
+                    caption = (
+                        f"[{escaped_title}]({escaped_photo_link})\n"
+                        f"{escaped_username}\n\n"
+                        f"𝖳𝗁𝗂𝗌 𝗅𝗂𝗇𝗄 𝗐𝗂𝗅𝗅 𝖾𝗑𝗉𝗂𝗋𝖾 𝗂𝗇 {expire_seconds} seconds\\."
+                    )
+                    
+                    await message.reply_photo(
+                        photo=photo_link,
+                        caption=caption,
+                        reply_markup=button,
+                        parse_mode=ParseMode.MARKDOWN
+                    )
+                except Exception as e:
+                    print(f"Error sending photo message: {e}")
+                    # Fallback to text message if photo fails
+                    await message.reply_text(
+                        "<b><blockquote expandable>ʜᴇʀᴇ ɪs ʏᴏᴜʀ ʟɪɴᴋ! ᴄʟɪᴄᴋ ʙᴇʟᴏᴡ ᴛᴏ ᴘʀᴏᴄᴇᴇᴅ</b>",
+                        reply_markup=button,
+                        parse_mode=ParseMode.HTML
+                    )
+            else:
+                # Original text message behavior
+                await message.reply_text(
+                    "<b><blockquote expandable>ʜᴇʀᴇ ɪs ʏᴏᴜʀ ʟɪɴᴋ! ᴄʟɪᴄᴋ ʙᴇʟᴏᴡ ᴛᴏ ᴘʀᴏᴄᴇᴇᴅ</b>",
+                    reply_markup=button,
+                    parse_mode=ParseMode.HTML
+                )
 
-            note_msg = await message.reply_text(
-                "<u><b>Note: If the link is expired, please click the post link again to get a new one.</b></u>",
-                parse_mode=ParseMode.HTML
-            )
-
-            # Auto-delete the note message after 5 minutes
-            asyncio.create_task(delete_after_delay(note_msg, 300))
+            if not photo_link:
+                note_msg = await message.reply_text(
+                    "<u><b>Note: If the link is expired, please click the post link again to get a new one.</b></u>",
+                    parse_mode=ParseMode.HTML
+                )
+                # Auto-delete the note message after 5 minutes
+                asyncio.create_task(delete_after_delay(note_msg, 300))
 
             asyncio.create_task(revoke_invite_after_5_minutes(client, channel_id, invite_link, is_request_link))
 
