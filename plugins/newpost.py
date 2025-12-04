@@ -34,9 +34,14 @@ async def revoke_invite_after_5_minutes(client: Bot, channel_id: int, link: str,
 @Bot.on_message((filters.command('addchat') | filters.command('addch')) & is_owner_or_admin)
 async def set_channel(client: Bot, message: Message):
     try:
-        channel_id = int(message.command[1])
+        args = message.command[1:]
+        if len(args) < 1:
+            return await message.reply("<b><blockquote expandable>Iɴᴠᴀʟɪᴅ ᴄʜᴀᴛ ID. Exᴀᴍᴘʟᴇ: <code>/addch &lt;chat_id&gt; [photo_link]</code></b>")
+        
+        channel_id = int(args[0])
+        photo_link = args[1] if len(args) > 1 else None
     except (IndexError, ValueError):
-        return await message.reply("<b><blockquote expandable>Iɴᴠᴀʟɪᴅ ᴄʜᴀᴛ ID. Exᴀᴍᴘʟᴇ: <code>/addchat &lt;chat_id&gt;</code></b>")
+        return await message.reply("<b><blockquote expandable>Iɴᴠᴀʟɪᴅ ᴄʜᴀᴛ ID. Exᴀᴍᴘʟᴇ: <code>/addch &lt;chat_id&gt; [photo_link]</code></b>")
     
     try:
         chat = await client.get_chat(channel_id)
@@ -62,13 +67,20 @@ async def set_channel(client: Bot, message: Message):
                 return await message.reply(f"<b><blockquote expandable>I ᴀᴍ ɪɴ {chat.title}, ʙᴜᴛ I ʟᴀᴄᴋ ᴘᴏsᴛɪɴɢ ᴏʀ ᴇᴅɪᴛɪɴɢ ᴘᴇʀᴍɪssɪᴏɴs.</b>")
         
         await save_channel(channel_id)
+        
+        if photo_link:
+            from database.database import save_channel_photo
+            await save_channel_photo(channel_id, photo_link)
+        
         base64_invite = await save_encoded_link(channel_id)
         normal_link = f"https://t.me/{client.username}?start={base64_invite}"
         base64_request = await encode(str(channel_id))
         await save_encoded_link2(channel_id, base64_request)
         request_link = f"https://t.me/{client.username}?start=req_{base64_request}"
+        
+        photo_mode_text = "\n<b>📸 Pʜᴏᴛᴏ Mᴏᴅᴇ: Eɴᴀʙʟᴇᴅ</b>" if photo_link else ""
         reply_text = (
-            f"<b><blockquote expandable>✅ Cʜᴀᴛ {chat.title} ({channel_id}) ʜᴀs ʙᴇᴇɴ ᴀᴅᴅᴇᴅ sᴜᴄᴄᴇssғᴜʟʟʏ.</b>\n\n"
+            f"<b><blockquote expandable>✅ Cʜᴀᴛ {chat.title} ({channel_id}) ʜᴀs ʙᴇᴇɴ ᴀᴅᴅᴇᴅ sᴜᴄᴄᴇssғᴜʟʟʏ.</b>{photo_mode_text}\n\n"
             f"<b>🔗 Nᴏʀᴍᴀʟ Lɪɴᴋ:</b> <code>{normal_link}</code>\n"
             f"<b>🔗 Rᴇǫᴜᴇsᴛ Lɪɴᴋ:</b> <code>{request_link}</code>"
         )
@@ -503,4 +515,3 @@ async def get_chat_info(client, channel_id):
         if channel_id in chat_info_cache:
             return chat_info_cache[channel_id][0]
         raise e
-
