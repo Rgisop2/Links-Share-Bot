@@ -170,8 +170,9 @@ async def start_command(client: Bot, message: Message):
                     escaped_photo_link = photo_link  # URL doesn't need escaping in MarkdownV2
                     
                     caption = (
-                        f"[{escaped_title}]({escaped_photo_link})\n"
-                        f"{escaped_username}\n\n"
+                        f"[{escaped_title}]\n"
+                        f"{escaped_username}\n"
+                        f"<blockquote>• Audio: Hindi \n • Quality: 480p+720p+1080p\n\n <blockquote>"
                         f"𝖳𝗁𝗂𝗌 𝗅𝗂𝗇𝗄 𝗐𝗂𝗅𝗅 𝖾𝗑𝗉𝗂𝗋𝖾 𝗂𝗇 {expire_seconds} seconds\\."
                     )
                     
