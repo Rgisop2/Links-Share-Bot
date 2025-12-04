@@ -180,7 +180,7 @@ async def start_command(client: Bot, message: Message):
                         photo=photo_link,
                         caption=caption,
                         reply_markup=button,
-                        parse_mode=ParseMode.MARKDOWN
+                        parse_mode=ParseMode.HTML
                     )
                 except Exception as e:
                     print(f"Error sending photo message: {e}")
