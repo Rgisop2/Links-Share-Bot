@@ -193,10 +193,10 @@ async def start_command(client: Bot, message: Message):
             else:
                 # Original text message behavior
                 await message.reply_text(
-                    "<b><blockquote expandable>ʜᴇʀᴇ <b>{channel_title}</b> ɪs ʏᴏᴜʀ ʟɪɴᴋ! ᴄʟɪᴄᴋ ʙᴇʟᴏᴡ ᴛᴏ ᴘʀᴏᴄᴇᴇᴅ</b>",
-                    reply_markup=button,
-                    parse_mode=ParseMode.HTML
-                )
+    f"<b><blockquote expandable>ʜᴇʀᴇ <b>{channel_title}</b> ɪs ʏᴏᴜʀ ʟɪɴᴋ! ᴄʟɪᴄᴋ ʙᴇʟᴏᴡ ᴛᴏ ᴘʀᴏᴄᴇᴇᴅ</blockquote></b>",
+    reply_markup=button,
+    parse_mode=ParseMode.HTML
+)
 
             if not photo_link:
                 note_msg = await message.reply_text(
