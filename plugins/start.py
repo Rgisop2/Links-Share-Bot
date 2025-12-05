@@ -61,10 +61,7 @@ async def start_command(client: Bot, message: Message):
             
             if not channel_id:
                 print(f"[v0] Channel not found for encoded link: {base64_string}")
-                return await message.reply_text(
-                    "<b><blockquote expandable>Invalid or expired invite link.</b></blockquote>",
-                    parse_mode=ParseMode.HTML
-                )
+                return
 
             print(f"[v0] Channel found: {channel_id}")
             
@@ -194,14 +191,9 @@ async def start_command(client: Bot, message: Message):
             asyncio.create_task(revoke_invite_after_5_minutes(client, channel_id, invite_link, is_request_link))
 
         except Exception as e:
-            print(f"[v0] Error in start command: {e}")
-            print(f"[v0] Error type: {type(e).__name__}")
-            import traceback
+            print(f"[v0] Error processing start command: {e}")
             print(f"[v0] Full traceback: {traceback.format_exc()}")
-            await message.reply_text(
-                "<b><blockquote expandable>Invalid or expired invite link.</b></blockquote>",
-                parse_mode=ParseMode.HTML
-            )
+            return
     else:
         inline_buttons = InlineKeyboardMarkup(
             [
@@ -494,4 +486,194 @@ async def broadcast(client: Bot, message: Message):
             await del_user(chat_id)
             deleted += 1
         except:
-            unsucc
+            unsuccessful += 1
+            await del_user(chat_id)
+
+        # Progress
+        percent_complete = i / total
+        if percent_complete - last_update_percentage >= update_interval or last_update_percentage == 0:
+            num_blocks = int(percent_complete * bar_length)
+            progress_bar = "●" * num_blocks + "○" * (bar_length - num_blocks)
+            status_update = f"""<b>›› BROADCAST ({' + '.join(mode_text)}) IN PROGRESS...
+
+<blockquote>⏳:</b> [{progress_bar}] <code>{percent_complete:.0%}</code></blockquote>
+
+<b>›› Total Users: <code>{total}</code>
+›› Successful: <code>{successful}</code>
+›› Blocked: <code>{blocked}</code>
+›› Deleted: <code>{deleted}</code>
+›› Unsuccessful: <code>{unsuccessful}</code></b>
+
+<i>➪ To stop broadcasting click: <b>/cancel</b></i>"""
+            await pls_wait.edit(status_update)
+            last_update_percentage = percent_complete
+
+    # Final status
+    final_status = f"""<b>›› BROADCAST ({' + '.join(mode_text)}) COMPLETED ✅
+
+<blockquote>Dᴏɴᴇ:</b> [{progress_bar}] {percent_complete:.0%}</blockquote>
+
+<b>›› Total Users: <code>{total}</code>
+›› Successful: <code>{successful}</code>
+›› Blocked: <code>{blocked}</code>
+›› Deleted: <code>{deleted}</code>
+›› Unsuccessful: <code>{unsuccessful}</code></b>"""
+    return await pls_wait.edit(final_status)
+
+
+# helper for delete mode
+async def auto_delete(sent_msg, duration):
+    await asyncio.sleep(duration)
+    try:
+        await sent_msg.delete()
+    except:
+        pass
+
+
+#----------------------------------
+
+user_message_count = {}
+user_banned_until = {}
+
+MAX_MESSAGES = 3
+TIME_WINDOW = timedelta(seconds=10)
+BAN_DURATION = timedelta(hours=1)
+
+"""
+
+@Bot.on_message(filters.private)
+async def monitor_messages(client: Bot, message: Message):
+    user_id = message.from_user.id
+    now = datetime.now()
+
+    if message.text and message.text.startswith("/"):
+        return
+
+    if user_id in ADMINS:
+        return 
+
+    if user_id in user_banned_until and now < user_banned_until[user_id]:
+        await message.reply_text(
+            "<b><blockquote expandable>You are temporarily banned from using commands due to spamming. Try again later.</b></blockquote>",
+            parse_mode=ParseMode.HTML
+        )
+        return
+
+    if user_id not in user_message_count:
+        user_message_count[user_id] = []
+
+    user_message_count[user_id].append(now)
+    user_message_count[user_id] = [time for time in user_message_count[user_id] if now - time <= TIME_WINDOW]
+
+    if len(user_message_count[user_id]) > MAX_MESSAGES:
+        user_banned_until[user_id] = now + BAN_DURATION
+        await message.reply_text(
+            "<b><blockquote expandable>You are temporarily banned from using commands due to spamming. Try again later.</b></blockquote>",
+            parse_mode=ParseMode.HTML
+        )
+        return
+
+"""
+
+@Bot.on_callback_query()
+async def cb_handler(client: Bot, query: CallbackQuery):
+    data = query.data  
+    chat_id = query.message.chat.id
+    
+    if data == "close":
+        await query.message.delete()
+        try:
+            await query.message.reply_to_message.delete()
+        except:
+            pass
+    
+    elif data == "about":
+        user = await client.get_users(OWNER_ID)
+        user_link = f"https://t.me/{user.username}" if user.username else f"tg://openmessage?user_id={OWNER_ID}"
+        
+        await query.edit_message_media(
+            InputMediaPhoto(
+                "https://envs.sh/Wdj.jpg",
+                ABOUT_TXT
+            ),
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton('• ʙᴀᴄᴋ', callback_data='start'), InlineKeyboardButton('ᴄʟᴏsᴇ •', callback_data='close')]
+            ]),
+        )
+
+    elif data == "channels":
+        user = await client.get_users(OWNER_ID)
+        user_link = f"https://t.me/{user.username}" if user.username else f"tg://openmessage?user_id={OWNER_ID}" 
+        ownername = f"<a href={user_link}>{user.first_name}</a>" if user.first_name else f"<a href={user_link}>no name !</a>"
+        await query.edit_message_media(
+            InputMediaPhoto("https://envs.sh/Wdj.jpg", 
+                            CHANNELS_TXT
+            ),
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton('• ʙᴀᴄᴋ', callback_data='start'), InlineKeyboardButton('home•', callback_data='setting')]
+            ]),
+        )
+    elif data.startswith("rfs_ch_"):
+        cid = int(data.split("_")[2])
+        try:
+            chat = await client.get_chat(cid)
+            mode = await db.get_channel_mode(cid)
+            status = "🟢 ᴏɴ" if mode == "on" else "🔴 ᴏғғ"
+            new_mode = "ᴏғғ" if mode == "on" else "on"
+            buttons = [
+                [InlineKeyboardButton(f"ʀᴇǫ ᴍᴏᴅᴇ {'OFF' if mode == 'on' else 'ON'}", callback_data=f"rfs_toggle_{cid}_{new_mode}")],
+                [InlineKeyboardButton("‹ ʙᴀᴄᴋ", callback_data="fsub_back")]
+            ]
+            await query.message.edit_text(
+                f"Channel: {chat.title}\nCurrent Force-Sub Mode: {status}",
+                reply_markup=InlineKeyboardMarkup(buttons)
+            )
+        except Exception:
+            await query.answer("Failed to fetch channel info", show_alert=True)
+
+    elif data.startswith("rfs_toggle_"):
+        cid, action = data.split("_")[2:]
+        cid = int(cid)
+        mode = "on" if action == "on" else "off"
+
+        await db.set_channel_mode(cid, mode)
+        await query.answer(f"Force-Sub set to {'ON' if mode == 'on' else 'OFF'}")
+
+        # Refresh the same channel's mode view
+        chat = await client.get_chat(cid)
+        status = "🟢 ON" if mode == "on" else "🔴 OFF"
+        new_mode = "off" if mode == "on" else "on"
+        buttons = [
+            [InlineKeyboardButton(f"ʀᴇǫ ᴍᴏᴅᴇ {'OFF' if mode == 'on' else 'ON'}", callback_data=f"rfs_toggle_{cid}_{new_mode}")],
+            [InlineKeyboardButton("‹ ʙᴀᴄᴋ", callback_data="fsub_back")]
+        ]
+        await query.message.edit_text(
+            f"Channel: {chat.title}\nCurrent Force-Sub Mode: {status}",
+            reply_markup=InlineKeyboardMarkup(buttons)
+        )
+
+    elif data == "fsub_back":
+        channels = await db.show_channels()
+        buttons = []
+        for cid in channels:
+            try:
+                chat = await client.get_chat(cid)
+                mode = await db.get_channel_mode(cid)
+                status = "🟢" if mode == "on" else "🔴"
+                buttons.append([InlineKeyboardButton(f"{status} {chat.title}", callback_data=f"rfs_ch_{cid}")])
+            except:
+                continue
+
+        await query.message.edit_text(
+            "sᴇʟᴇᴄᴛ ᴀ ᴄʜᴀɴɴᴇʟ ᴛᴏ ᴛᴏɢɢʟᴇ ɪᴛs ғᴏʀᴄᴇ-sᴜʙ ᴍᴏᴅᴇ:",
+            reply_markup=InlineKeyboardMarkup(buttons)
+        )
+
+def delete_after_delay(msg, delay):
+    async def inner():
+        await asyncio.sleep(delay)
+        try:
+            await msg.delete()
+        except:
+            pass
+    return inner()
