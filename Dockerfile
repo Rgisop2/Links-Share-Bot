@@ -1,10 +1,13 @@
-FROM python:3.8-slim-buster
+FROM python:3.9-slim-buster
+
 WORKDIR /app
 
+# Upgrade pip (important)
+RUN python3 -m pip install --upgrade pip
+
 COPY requirements.txt requirements.txt
-RUN pip3 install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-CMD python3 main.py
-# +++ Modified By Yato [telegram username: @i_killed_my_clan & @ProYato] +++ # aNDI BANDI SANDI JISNE BHI CREDIT HATAYA USKI BANDI RAndi 
+CMD ["python3", "main.py"]
