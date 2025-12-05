@@ -82,13 +82,11 @@ ABOUT_TXT = """<b>›› ᴄᴏᴍᴍᴜɴɪᴛʏ: <a href='https://t.me/otakufl
 ›› ᴅᴀᴛᴀʙᴀsᴇ: MongoDB
 ›› ᴅᴇᴠᴇʟᴏᴘᴇʀ: @ProYato</b></blockquote>"""
 
-CHANNELS_TXT = """<b>›› Anime: <a href='https://t.me/animes_cruise'>Anime Cruise</a>
-<blockquote expandable>›› Movies: <a href='https://t.me/movieflixspot'>MovieFlix Spot</a>
-›› Webseries: <a href='https://t.me/webseries_flix'>Webseries Flix</a>
-›› Adult: <a href='https://t.me/hanime_arena'>CornHub</a>
-›› Manhwa: <a href='https://t.me/pornhwa_flix'>PornHwa</a>
-›› Community: <a href='https://t.me/otakuflix_network'>Otakuflix</a>
-›› Developer: @ProYato</b></blockquote>"""
+CHANNELS_TXT = """<b>›› Anime: <a href='https://t.me/Anime_Link_robot?start=req_LTEwMDIxMjI0NDQ0MTU'>Anime in Hindi</a>
+<blockquote expandable>›› Movies: <a href='https://t.me/Anime_Link_robot?start=req_LTEwMDE3Mjg1Mzk2ODg'>Anime Movie Hindi</a>
+›› Adult: <a href='https://t.me/Hanime_tv'>CornHub</a>
+›› Group: <a href='https://t.me/RG_Anime_Group_Chat'>αηιмє gяσυρ
+</b></blockquote>"""
 
 # ---------- BOT STATS & REPLY (ADDED BACK) ----------
 BOT_STATS_TEXT = "<b>BOT UPTIME</b>\n{uptime}"
