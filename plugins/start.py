@@ -193,7 +193,7 @@ async def start_command(client: Bot, message: Message):
             else:
                 # Original text message behavior
                 await message.reply_text(
-    f"<b><blockquote expandable>ʜᴇʀᴇ <b>{channel_title}</b> ɪs ʏᴏᴜʀ ʟɪɴᴋ! ᴄʟɪᴄᴋ ʙᴇʟᴏᴡ ᴛᴏ ᴘʀᴏᴄᴇᴇᴅ</blockquote></b>",
+    f"<b><blockquote expandable>ʜᴇʀᴇ <u>{channel_title}</u> ɪs ʏᴏᴜʀ ʟɪɴᴋ! ᴄʟɪᴄᴋ ʙᴇʟᴏᴡ ᴛᴏ ᴘʀᴏᴄᴇᴇᴅ</blockquote></b>",
     reply_markup=button,
     parse_mode=ParseMode.HTML
 )
