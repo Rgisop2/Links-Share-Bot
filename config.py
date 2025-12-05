@@ -55,6 +55,7 @@ START_IMG = "https://telegra.ph/file/f3d3aff9ec422158feb05-d2180e3665e0ac4d32.jp
 
 # ---------- MESSAGES ----------
 START_MSG = os.environ.get(
+START_MSG = os.environ.get(
     "START_MESSAGE",
     "𝙒𝙀𝙇𝘾𝙊𝙈𝙀 𝙏𝙊 𝙏𝙃𝙀 𝘼𝘿𝙑𝘼𝙉𝘾𝙀𝘿 𝙇𝙄𝙉𝙆𝙎 𝙎𝙃𝘼𝙍𝙄𝙉𝙂 𝘽𝙊𝙏."
 )
@@ -75,12 +76,11 @@ ABOUT = os.environ.get(
 )
 
 ABOUT_TXT = """
-<b>›› ᴄᴏᴍᴍᴜɴɪᴛʏ: <a href='https://t.me/RG_Anime_Group_Chat'>ᴀɴɪᴍᴇ ɢʀᴏᴜᴘ</a>
-<blockquote expandable>
-›› ᴜᴘᴅᴀᴛᴇs ᴄʜᴀɴɴᴇʟ: <a href='https://t.me/Anime_Link_robot?start=req_LTEwMDIxMjI0NDQ0MTU'>ᴄʟɪᴄᴋ ʜᴇʀᴇ</a>
-›› ʟᴀɴɢᴜᴀɢᴇ: Python 3
-›› ʟɪʙʀᴀʀʏ: Pyrogram v2
-›› ᴅᴀᴛᴀʙᴀsᴇ: MongoDB
+<b>◉ ᴄᴏᴍᴍᴜɴɪᴛʏ: <a href='https://t.me/RG_Anime_Group_Chat'>ᴀɴɪᴍᴇ ɢʀᴏᴜᴘ</a>
+<blockquote expandable> ◉ ᴜᴘᴅᴀᴛᴇs ᴄʜᴀɴɴᴇʟ: <a href='https://t.me/Anime_Link_robot?start=req_LTEwMDIxMjI0NDQ0MTU'>ᴄʟɪᴄᴋ ʜᴇʀᴇ</a>
+◉ ʟᴀɴɢᴜᴀɢᴇ: Python 3
+◉ ʟɪʙʀᴀʀʏ: Pyrogram v2
+◉ ᴅᴀᴛᴀʙᴀsᴇ: MongoDB
 </b></blockquote>
 """
 CHANNELS_TXT = """<b>›› Anime: <a href='https://t.me/Anime_Link_robot?start=req_LTEwMDIxMjI0NDQ0MTU'>Anime in Hindi</a>
