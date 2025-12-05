@@ -42,41 +42,32 @@ async def start_command(client: Bot, message: Message):
             
     await add_user(user_id)
 
-   # ✅ Check Force Subscription
-    #if not await is_subscribed(client, user_id):
-        #await temp.delete()
-        #return await not_joined(client, message)
-
-# 
-    # Check FSub requirements
-   #  fsub_channels = await get_fsub_channels()
-   #  if fsub_channels:
-    #     is_subscribed, subscription_message, subscription_buttons = await check_subscription_status(client, user_id, fsub_channels)
-   #      if not is_subscribed:
-    #         return await message.reply_text(
-    #             subscription_message,
-    #             reply_markup=subscription_buttons,
-    #             parse_mode=ParseMode.HTML
-     #        )
-
     text = message.text
     if len(text) > 7:
         try:
             base64_string = text.split(" ", 1)[1]
+            print(f"[v0] Processing link request from user {user_id}")
+            print(f"[v0] Base64 string: {base64_string}")
+            
             is_request = base64_string.startswith("req_")
             
             if is_request:
                 base64_string = base64_string[4:]
                 channel_id = await get_channel_by_encoded_link2(base64_string)
+                print(f"[v0] Request link detected, channel_id: {channel_id}")
             else:
                 channel_id = await get_channel_by_encoded_link(base64_string)
+                print(f"[v0] Normal link detected, channel_id: {channel_id}")
             
             if not channel_id:
+                print(f"[v0] Channel not found for encoded link: {base64_string}")
                 return await message.reply_text(
                     "<b><blockquote expandable>Invalid or expired invite link.</b></blockquote>",
                     parse_mode=ParseMode.HTML
                 )
 
+            print(f"[v0] Channel found: {channel_id}")
+            
             # Check if this is a /genlink link (original_link exists)
             from database.database import get_original_link
             original_link = await get_original_link(channel_id)
@@ -108,15 +99,17 @@ async def start_command(client: Bot, message: Message):
                         # Use existing link
                         invite_link = old_link_info["invite_link"]
                         is_request_link = old_link_info["is_request"]
+                        print(f"[v0] Using existing link for channel {channel_id}")
                     else:
                         # Revoke old link and create new one
                         try:
                             await client.revoke_chat_invite_link(channel_id, old_link_info["invite_link"])
-                            print(f"Revoked old {'request' if old_link_info['is_request'] else 'invite'} link for channel {channel_id}")
+                            print(f"[v0] Revoked old {'request' if old_link_info['is_request'] else 'invite'} link for channel {channel_id}")
                         except Exception as e:
-                            print(f"Failed to revoke old link for channel {channel_id}: {e}")
+                            print(f"[v0] Failed to revoke old link for channel {channel_id}: {e}")
                         
                         # Create new link
+                        print(f"[v0] Creating new link for channel {channel_id}, is_request={is_request}")
                         invite = await client.create_chat_invite_link(
                             chat_id=channel_id,
                             expire_date=current_time + timedelta(minutes=10),
@@ -125,8 +118,10 @@ async def start_command(client: Bot, message: Message):
                         invite_link = invite.invite_link
                         is_request_link = is_request
                         await save_invite_link(channel_id, invite_link, is_request_link)
+                        print(f"[v0] New link created: {invite_link}")
                 else:
                     # Create new link
+                    print(f"[v0] No existing link, creating new link for channel {channel_id}, is_request={is_request}")
                     invite = await client.create_chat_invite_link(
                         chat_id=channel_id,
                         expire_date=current_time + timedelta(minutes=10),
@@ -135,11 +130,12 @@ async def start_command(client: Bot, message: Message):
                     invite_link = invite.invite_link
                     is_request_link = is_request
                     await save_invite_link(channel_id, invite_link, is_request_link)
+                    print(f"[v0] New link created: {invite_link}")
 
             from database.database import get_channel_photo
             photo_link = await get_channel_photo(channel_id)
             
-            button_text = "• ʀᴇǫᴜᴇsᴛ ᴛᴏ ᴊᴏɪɴ •" if is_request_link else "• ᴊᴏɪɴ ᴄʜᴀɴɴᴇʟ •"
+            button_text = "• REQUEST TO JOIN •" if is_request_link else "• JOIN CHANNEL •"
             button = InlineKeyboardMarkup([[InlineKeyboardButton(button_text, url=invite_link)]])
 
             wait_msg = await message.reply_text(
@@ -154,25 +150,6 @@ async def start_command(client: Bot, message: Message):
                 try:
                     chat = await client.get_chat(channel_id)
                     channel_title = chat.title
-                    channel_username = f"@{chat.username}" if chat.username else ""
-                    
-                    # Remove "Hindi" from end of title if present
-                    if channel_title.endswith(" Hindi"):
-                        channel_title = channel_title[:-6].strip()
-                    
-                    # Calculate expiration time (10 minutes)
-                    expire_seconds = 600
-                    
-                    # Escape special characters for MarkdownV2
-                    def escape_markdown(text):
-                        special_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
-                        for char in special_chars:
-                            text = text.replace(char, f'\\{char}')
-                        return text
-                    
-                    escaped_title = escape_markdown(channel_title)
-                    escaped_username = escape_markdown(channel_username)
-                    escaped_photo_link = photo_link  # URL doesn't need escaping in MarkdownV2
                     
                     caption = f"Here is your link for {channel_title}. Click below to proceed."
                     
@@ -182,7 +159,7 @@ async def start_command(client: Bot, message: Message):
                         reply_markup=button
                     )
                 except Exception as e:
-                    print(f"Error sending photo message: {e}")
+                    print(f"[v0] Error sending photo message: {e}")
                     # Fallback to text message if photo fails
                     try:
                         chat = await client.get_chat(channel_id)
@@ -217,11 +194,14 @@ async def start_command(client: Bot, message: Message):
             asyncio.create_task(revoke_invite_after_5_minutes(client, channel_id, invite_link, is_request_link))
 
         except Exception as e:
+            print(f"[v0] Error in start command: {e}")
+            print(f"[v0] Error type: {type(e).__name__}")
+            import traceback
+            print(f"[v0] Full traceback: {traceback.format_exc()}")
             await message.reply_text(
                 "<b><blockquote expandable>Invalid or expired invite link.</b></blockquote>",
                 parse_mode=ParseMode.HTML
             )
-            print(f"Decoding error: {e}")
     else:
         inline_buttons = InlineKeyboardMarkup(
             [
@@ -497,4 +477,21 @@ async def broadcast(client: Bot, message: Message):
 
             successful += 1
         except FloodWait as e:
-            await asyncio.sleep
+            await asyncio.sleep(e.x)
+            try:
+                sent_msg = await broadcast_msg.copy(chat_id, disable_notification=silent)
+                if do_pin:
+                    await client.pin_chat_message(chat_id, sent_msg.id, both_sides=True)
+                if do_delete:
+                    asyncio.create_task(auto_delete(sent_msg, duration))
+                successful += 1
+            except:
+                unsuccessful += 1
+        except UserIsBlocked:
+            await del_user(chat_id)
+            blocked += 1
+        except InputUserDeactivated:
+            await del_user(chat_id)
+            deleted += 1
+        except:
+            unsucc
