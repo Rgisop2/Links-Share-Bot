@@ -85,7 +85,7 @@ ABOUT_TXT = """<b>›› ᴄᴏᴍᴍᴜɴɪᴛʏ: <a href='https://t.me/otakufl
 CHANNELS_TXT = """<b>›› Anime: <a href='https://t.me/Anime_Link_robot?start=req_LTEwMDIxMjI0NDQ0MTU'>Anime in Hindi</a>
 <blockquote expandable>›› Movies: <a href='https://t.me/Anime_Link_robot?start=req_LTEwMDE3Mjg1Mzk2ODg'>Anime Movie Hindi</a>
 ›› Adult: <a href='https://t.me/Hanime_tv'>CornHub</a>
-›› Group: <a href='https://t.me/RG_Anime_Group_Chat'>αηιмє gяσυρ
+›› Group: <a href='https://t.me/RG_Anime_Group_Chat'>αηιмє gяσυρ</a>
 </b></blockquote>"""
 
 # ---------- BOT STATS & REPLY (ADDED BACK) ----------
