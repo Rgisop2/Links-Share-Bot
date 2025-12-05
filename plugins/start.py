@@ -191,45 +191,40 @@ async def start_command(client: Bot, message: Message):
                         parse_mode=ParseMode.HTML
                     )
             else:
-                # -----------------------------------------
-# FETCH CHANNEL TITLE SAFELY (NO ERROR)
-# -----------------------------------------
+    # -----------------------------------------
+    # FETCH CHANNEL TITLE SAFELY (NO ERROR)
+    # -----------------------------------------
 
-channel_title = "Channel"   # default fallback
+    channel_title = "Channel"   # default fallback
 
-try:
-    chat = await client.get_chat(channel_id)
-    channel_title = chat.title if chat.title else "Channel"
-except:
-    pass   # fallback title will be used
+    try:
+        chat = await client.get_chat(channel_id)
+        channel_title = chat.title if chat.title else "Channel"
+    except:
+        pass   # fallback title will be used
 
+    # -----------------------------------------
+    # ORIGINAL TEXT MESSAGE BEHAVIOR (NO PHOTO)
+    # -----------------------------------------
 
-# -----------------------------------------
-# ORIGINAL TEXT MESSAGE BEHAVIOR (NO PHOTO)
-# -----------------------------------------
+    await message.reply_text(
+        f"<b><blockquote expandable>ʜᴇʀᴇ <u>{channel_title}</u> ɪs ʏᴏᴜʀ ʟɪɴᴋ! "
+        f"ᴄʟɪᴄᴋ ʙᴇʟᴏᴡ ᴛᴏ ᴘʀᴏᴄᴇᴇᴅ</blockquote></b>",
+        reply_markup=button,
+        parse_mode=ParseMode.HTML
+    )
 
-await message.reply_text(
-    f"<b><blockquote expandable>ʜᴇʀᴇ <u>{channel_title}</u> ɪs ʏᴏᴜʀ ʟɪɴᴋ! "
-    f"ᴄʟɪᴄᴋ ʙᴇʟᴏᴡ ᴛᴏ ᴘʀᴏᴄᴇᴇᴅ</blockquote></b>",
-    reply_markup=button,
-    parse_mode=ParseMode.HTML
-)
+    # -----------------------------------------
+    # OPTIONAL NOTE MESSAGE
+    # -----------------------------------------
 
+    note_msg = await message.reply_text(
+        "<u><b>Note: If the link is expired, please click the post link again to get a new one.</b></u>",
+        parse_mode=ParseMode.HTML
+    )
 
-# -----------------------------------------
-# OPTIONAL NOTE MESSAGE
-# -----------------------------------------
-
-note_msg = await message.reply_text(
-    "<u><b>Note: If the link is expired, please click the post link again to get a new one.</b></u>",
-    parse_mode=ParseMode.HTML
-)
-
-# Auto delete note after 5 mins
-asyncio.create_task(delete_after_delay(note_msg, 300))
-                # Auto-delete the note message after 5 minutes
-                asyncio.create_task(delete_after_delay(note_msg, 300))
-
+    # Auto delete note after 5 mins
+    asyncio.create_task(delete_after_delay(note_msg, 300))
             asyncio.create_task(revoke_invite_after_5_minutes(client, channel_id, invite_link, is_request_link))
 
         except Exception as e:
