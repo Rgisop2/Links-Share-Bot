@@ -191,17 +191,17 @@ async def start_command(client: Bot, message: Message):
                         parse_mode=ParseMode.HTML
                     )
             else:
-                # Original text message behavior
-                try:
-    chat = await client.get_chat(channel_id)
-    channel_name = chat.title
-except:
-    channel_name = "the channel"
+    # Original text message behavior
+    try:
+        chat = await client.get_chat(channel_id)
+        channel_name = chat.title
+    except:
+        channel_name = "the channel"
 
-await message.reply_text(
-    f"Here is your link for {channel_name}. Click below to proceed.",
-    reply_markup=button
-)
+    await message.reply_text(
+        f"Here is your link for {channel_name}. Click below to proceed.",
+        reply_markup=button
+    )
 
             if not photo_link:
                 note_msg = await message.reply_text(
