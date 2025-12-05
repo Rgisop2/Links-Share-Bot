@@ -55,7 +55,6 @@ START_IMG = "https://telegra.ph/file/f3d3aff9ec422158feb05-d2180e3665e0ac4d32.jp
 
 # ---------- MESSAGES ----------
 START_MSG = os.environ.get(
-START_MSG = os.environ.get(
     "START_MESSAGE",
     "𝙒𝙀𝙇𝘾𝙊𝙈𝙀 𝙏𝙊 𝙏𝙃𝙀 𝘼𝘿𝙑𝘼𝙉𝘾𝙀𝘿 𝙇𝙄𝙉𝙆𝙎 𝙎𝙃𝘼𝙍𝙄𝙉𝙂 𝘽𝙊𝙏."
 )
