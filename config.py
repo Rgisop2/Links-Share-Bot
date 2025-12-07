@@ -19,7 +19,7 @@ def safe_int(value, default=None, required=False, varname=""):
     return int(value)
 
 # ---------- RECOMMENDED ----------
-TG_BOT_TOKEN = os.environ.get("TG_BOT_TOKEN", "1666265344:AAFEDY9PNah9_gnowspdm1K4WEzf7mMa2OE")
+TG_BOT_TOKEN = os.environ.get("TG_BOT_TOKEN", "8192500288:AAF9ziDCKTDPlxepTXbGziIIOuKrTzMebqM")
 APP_ID = safe_int(os.environ.get("APP_ID", "23715627"), required=True, varname="APP_ID")
 API_HASH = os.environ.get("API_HASH", "26c335fe953856eb72845e02c6c44930")
 
@@ -50,8 +50,8 @@ APPROVED = environ.get("APPROVED_WELCOME", "on").lower()
 TG_BOT_WORKERS = safe_int(os.environ.get("TG_BOT_WORKERS", "40"), default=40, varname="TG_BOT_WORKERS")
 
 # ---------- START PICS ----------
-START_PIC = "https://telegra.ph/file/f3d3aff9ec422158feb05-d2180e3665e0ac4d32.jpg"
-START_IMG = "https://telegra.ph/file/f3d3aff9ec422158feb05-d2180e3665e0ac4d32.jpg"
+START_PIC = "https://i.ibb.co/FbvfM8Mh/7700112188-6e9c9c7a.jpg"
+START_IMG = "https://i.ibb.co/FbvfM8Mh/7700112188-6e9c9c7a.jpg"
 
 # ---------- MESSAGES ----------
 START_MSG = os.environ.get(
@@ -76,7 +76,7 @@ ABOUT = os.environ.get(
 
 ABOUT_TXT = """
 <b>◉ ᴄᴏᴍᴍᴜɴɪᴛʏ: <a href='https://t.me/RG_Anime_Group_Chat'>ᴀɴɪᴍᴇ ɢʀᴏᴜᴘ</a>
-<blockquote expandable> ◉ ᴜᴘᴅᴀᴛᴇs ᴄʜᴀɴɴᴇʟ: <a href='https://t.me/Anime_Link_robot?start=req_LTEwMDIxMjI0NDQ0MTU'>ᴄʟɪᴄᴋ ʜᴇʀᴇ</a>
+<blockquote expandable> ◉ ᴜᴘᴅᴀᴛᴇs ᴄʜᴀɴɴᴇʟ: <a href='https://t.me/Anime_Link_robot?req_LTEwMDIxMjI0NDQ0MTU'>ᴄʟɪᴄᴋ ʜᴇʀᴇ</a>
 ◉ ʟᴀɴɢᴜᴀɢᴇ: Python 3
 ◉ ʟɪʙʀᴀʀʏ: Pyrogram v2
 ◉ ᴅᴀᴛᴀʙᴀsᴇ: MongoDB
