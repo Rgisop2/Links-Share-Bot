@@ -77,19 +77,50 @@ async def start_command(client: Bot, message: Message):
                     parse_mode=ParseMode.HTML
                 )
 
-            await client.send_chat_action(message.chat.id, ChatAction.TYPING)
+            typing_task = client.send_chat_action(message.chat.id, ChatAction.TYPING)
+
+            from database.database import get_original_link, get_cached_channel_info
+            
+            original_link_task = get_original_link(channel_id)
+            old_link_info_task = get_current_invite_link(channel_id)
+            photo_task = get_channel_photo(channel_id)
+            cached_info_task = get_cached_channel_info(channel_id)
+            
+            # Start typing and fetch all data concurrently
+            await typing_task
+            original_link, old_link_info, photo_link, cached_info = await asyncio.gather(
+                original_link_task,
+                old_link_info_task,
+                photo_task,
+                cached_info_task,
+                return_exceptions=True
+            )
+            
+            # Handle exceptions
+            if isinstance(original_link, Exception):
+                original_link = None
+            if isinstance(old_link_info, Exception):
+                old_link_info = None
+            if isinstance(photo_link, Exception):
+                photo_link = None
+            if isinstance(cached_info, Exception):
+                cached_info = None
 
             # Check if this is a /genlink link (original_link exists)
-            from database.database import get_original_link
-            original_link = await get_original_link(channel_id)
             if original_link:
-                try:
-                    chat = await client.get_chat(channel_id)
-                    channel_title = chat.title
+                if cached_info and cached_info.get("title"):
+                    channel_title = cached_info["title"]
                     genlink_text = f"<b><blockquote expandable>ʜᴇʀᴇ ɪs ʏᴏᴜʀ ʟɪɴᴋ! {channel_title} ᴄʟɪᴄᴋ ʙᴇʟᴏᴡ ᴛᴏ ᴘʀᴏᴄᴇᴇᴅ</b>"
-                except Exception as e:
-                    print(f"Error getting channel title for genlink: {e}")
-                    genlink_text = "<b><blockquote expandable>ʜᴇʀᴇ ɪs ʏᴏᴜʀ ʟɪɴᴋ! ᴄʟɪᴄᴋ ʙᴇʟᴏᴡ ᴛᴏ ᴘʀᴏᴄᴇᴇᴅ</b>"
+                else:
+                    try:
+                        chat = await client.get_chat(channel_id)
+                        channel_title = chat.title
+                        from database.database import cache_channel_info
+                        await cache_channel_info(channel_id, channel_title, chat.username)
+                        genlink_text = f"<b><blockquote expandable>ʜᴇʀᴇ ɪs ʏᴏᴜʀ ʟɪɴᴋ! {channel_title} ᴄʟɪᴄᴋ ʙᴇʟᴏᴡ ᴛᴏ ᴘʀᴏᴄᴇᴇᴅ</b>"
+                    except Exception as e:
+                        print(f"Error getting channel title for genlink: {e}")
+                        genlink_text = "<b><blockquote expandable>ʜᴇʀᴇ ɪs ʏᴏᴜʀ ʟɪɴᴋ! ᴄʟɪᴄᴋ ʙᴇʟᴏᴡ ᴛᴏ ᴘʀᴏᴄᴇᴇᴅ</b>"
                 button = InlineKeyboardMarkup(
                     [[InlineKeyboardButton("• Proceed to Link •", url=original_link)]]
                 )
@@ -99,71 +130,111 @@ async def start_command(client: Bot, message: Message):
                     parse_mode=ParseMode.HTML
                 )
 
+            if cached_info and cached_info.get("title"):
+                channel_title = cached_info["title"]
+                channel_username = f"@{cached_info['username']}" if cached_info.get("username") else ""
+                chat = None  # We don't need to fetch chat
+            else:
+                chat = None
+                channel_title = None
+                channel_username = ""
+            
+            current_time = datetime.now()
+            
+            if old_link_info:
+                link_created_time = await get_link_creation_time(channel_id)
+                if link_created_time and (current_time - link_created_time).total_seconds() < 240:  # 4 minutes
+                    invite_link = old_link_info["invite_link"]
+                    is_request_link = old_link_info["is_request"]
+                    
+                    if not channel_title:
+                        try:
+                            chat = await client.get_chat(channel_id)
+                            channel_title = chat.title
+                            channel_username = f"@{chat.username}" if chat.username else ""
+                            # Cache for next time
+                            from database.database import cache_channel_info
+                            await cache_channel_info(channel_id, channel_title, chat.username)
+                        except Exception as e:
+                            print(f"Error fetching chat info: {e}")
+                            channel_title = "Channel"
+                            channel_username = ""
+                    
+                    button_text = "• ʀᴇǫᴜᴇsᴛ ᴛᴏ ᴊᴏɪɴ •" if is_request_link else "• ᴊᴏɪɴ ᴄʜᴀɴɴᴇʟ •"
+                    button = InlineKeyboardMarkup([[InlineKeyboardButton(button_text, url=invite_link)]])
+                    
+                    if photo_link:
+                        # Remove "Hindi" from end of title if present
+                        if channel_title.endswith(" Hindi"):
+                            channel_title = channel_title[:-6].strip()
+                            
+                        expire_seconds = 600
+                        
+                        def escape_markdown(text):
+                            special_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+                            for char in special_chars:
+                                text = text.replace(char, f'\\{char}')
+                            return text
+                        
+                        escaped_title = escape_markdown(channel_title)
+                        escaped_username = escape_markdown(channel_username)
+                        
+                        caption = (
+    f"<b>{escaped_title}</b>\n"
+    f"{escaped_username}"
+    f"<blockquote>• Audio: Hindi\n• Quality: 480p + 720p + 1080p</blockquote>\n\n"
+    f"This link will expire in {expire_seconds} seconds."
+                        )
+                        
+                        return await message.reply_photo(
+                            photo=photo_link,
+                            caption=caption,
+                            reply_markup=button,
+                            parse_mode=ParseMode.HTML
+                        )
+                    else:
+                        text_message = f"<b><blockquote expandable>ʜᴇʀᴇ ɪs ʏᴏᴜʀ ʟɪɴᴋ! {channel_title} ᴄʟɪᴄᴋ ʙᴇʟᴏᴡ ᴛᴏ ᴘʀᴏᴄᴇᴇᴅ</b>"
+                        return await message.reply_text(
+                            text_message,
+                            reply_markup=button,
+                            parse_mode=ParseMode.HTML
+                        )
+
             # Use a lock for this channel to prevent concurrent link generation
             async with channel_locks[channel_id]:
-                chat_task = client.get_chat(channel_id)
-                old_link_info_task = get_current_invite_link(channel_id)
-                photo_task = get_channel_photo(channel_id)
-                
-                # Await all tasks concurrently
-                chat, old_link_info, photo_link = await asyncio.gather(
-                    chat_task, 
-                    old_link_info_task, 
-                    photo_task,
-                    return_exceptions=True
-                )
-                
-                # Handle exceptions from gather
-                if isinstance(chat, Exception):
-                    print(f"Error fetching chat info: {chat}")
-                    chat = None
-                if isinstance(old_link_info, Exception):
-                    print(f"Error fetching old link info: {old_link_info}")
-                    old_link_info = None
-                if isinstance(photo_link, Exception):
-                    print(f"Error fetching photo link: {photo_link}")
-                    photo_link = None
-                
-                # Get channel title early
-                channel_title = chat.title if chat else "Channel"
-                channel_username = f"@{chat.username}" if (chat and chat.username) else ""
-                
-                current_time = datetime.now()
-                
-                # If we have an existing link and it's not expired yet (assuming 5 minutes validity)
-                if old_link_info:
-                    link_created_time = await get_link_creation_time(channel_id)
-                    if link_created_time and (current_time - link_created_time).total_seconds() < 240:  # 4 minutes
-                        # Use existing link
-                        invite_link = old_link_info["invite_link"]
-                        is_request_link = old_link_info["is_request"]
-                    else:
-                        # Revoke old link and create new one
-                        try:
-                            await client.revoke_chat_invite_link(channel_id, old_link_info["invite_link"])
-                            print(f"Revoked old {'request' if old_link_info['is_request'] else 'invite'} link for channel {channel_id}")
-                        except Exception as e:
-                            print(f"Failed to revoke old link for channel {channel_id}: {e}")
-                        
-                        # Create new link
-                        invite = await client.create_chat_invite_link(
-                            chat_id=channel_id,
-                            expire_date=current_time + timedelta(minutes=10),
-                            creates_join_request=is_request
-                        )
-                        invite_link = invite.invite_link
-                        is_request_link = is_request
-                        await save_invite_link(channel_id, invite_link, is_request_link)
+                if not chat:
+                    try:
+                        chat = await client.get_chat(channel_id)
+                        channel_title = chat.title
+                        channel_username = f"@{chat.username}" if chat.username else ""
+                        # Cache for future
+                        from database.database import cache_channel_info
+                        await cache_channel_info(channel_id, channel_title, chat.username)
+                    except Exception as e:
+                        print(f"Error fetching chat info: {e}")
+                        channel_title = "Channel"
+                        channel_username = ""
                 else:
-                    # Create new link
-                    invite = await client.create_chat_invite_link(
-                        chat_id=channel_id,
-                        expire_date=current_time + timedelta(minutes=10),
-                        creates_join_request=is_request
-                    )
-                    invite_link = invite.invite_link
-                    is_request_link = is_request
-                    await save_invite_link(channel_id, invite_link, is_request_link)
+                    channel_title = chat.title if chat else "Channel"
+                    channel_username = f"@{chat.username}" if (chat and chat.username) else ""
+                
+                # Revoke old link if exists
+                if old_link_info:
+                    try:
+                        await client.revoke_chat_invite_link(channel_id, old_link_info["invite_link"])
+                        print(f"Revoked old {'request' if old_link_info['is_request'] else 'invite'} link for channel {channel_id}")
+                    except Exception as e:
+                        print(f"Failed to revoke old link for channel {channel_id}: {e}")
+                
+                # Create new link
+                invite = await client.create_chat_invite_link(
+                    chat_id=channel_id,
+                    expire_date=current_time + timedelta(minutes=10),
+                    creates_join_request=is_request
+                )
+                invite_link = invite.invite_link
+                is_request_link = is_request
+                await save_invite_link(channel_id, invite_link, is_request_link)
 
             button_text = "• ʀᴇǫᴜᴇsᴛ ᴛᴏ ᴊᴏɪɴ •" if is_request_link else "• ᴊᴏɪɴ ᴄʜᴀɴɴᴇʟ •"
             button = InlineKeyboardMarkup([[InlineKeyboardButton(button_text, url=invite_link)]])
