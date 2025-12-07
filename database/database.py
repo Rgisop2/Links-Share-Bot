@@ -12,6 +12,7 @@ user_data = database['users']
 channels_collection = database['channels']
 fsub_channels_collection = database['fsub_channels']
 banned_users_collection = database['banned_users']
+admins_collection = database['admins']
 
 async def add_user(user_id: int) -> bool:
     """Add a user to the database if they don't exist."""
@@ -56,7 +57,6 @@ async def del_user(user_id: int) -> bool:
 
 async def is_admin(user_id: int) -> bool:
     """Check if a user is an admin."""
-    admins_collection = database['admins']
     try:
         user_id = int(user_id)  # Ensure always int
         return bool(await admins_collection.find_one({'_id': user_id}))
@@ -66,7 +66,6 @@ async def is_admin(user_id: int) -> bool:
 
 async def add_admin(user_id: int) -> bool:
     """Add a user as admin."""
-    admins_collection = database['admins']
     try:
         user_id = int(user_id)  # Ensure always int
         await admins_collection.update_one({'_id': user_id}, {'$set': {'_id': user_id}}, upsert=True)
@@ -77,7 +76,6 @@ async def add_admin(user_id: int) -> bool:
 
 async def remove_admin(user_id: int) -> bool:
     """Remove a user from admins."""
-    admins_collection = database['admins']
     try:
         result = await admins_collection.delete_one({'_id': user_id})
         return result.deleted_count > 0
@@ -87,7 +85,6 @@ async def remove_admin(user_id: int) -> bool:
 
 async def list_admins() -> list:
     """List all admin user IDs."""
-    admins_collection = database['admins']
     try:
         admins = await admins_collection.find().to_list(None)
         return [admin['_id'] for admin in admins]
@@ -350,6 +347,49 @@ async def get_original_link(channel_id: int) -> Optional[str]:
         return channel.get("original_link") if channel and "original_link" in channel else None
     except Exception as e:
         print(f"Error fetching original link for channel {channel_id}: {e}")
+        return None
+
+async def cache_channel_info(channel_id: int, title: str, username: str = None) -> bool:
+    """Cache channel title and username to avoid repeated API calls."""
+    if not isinstance(channel_id, int):
+        return False
+    try:
+        await channels_collection.update_one(
+            {"channel_id": channel_id},
+            {
+                "$set": {
+                    "cached_title": title,
+                    "cached_username": username,
+                    "cache_updated_at": datetime.utcnow()
+                }
+            },
+            upsert=True
+        )
+        return True
+    except Exception as e:
+        print(f"Error caching channel info for {channel_id}: {e}")
+        return False
+
+async def get_cached_channel_info(channel_id: int) -> Optional[dict]:
+    """Get cached channel info (title, username) to avoid API calls."""
+    if not isinstance(channel_id, int):
+        return None
+    try:
+        channel = await channels_collection.find_one(
+            {"channel_id": channel_id, "status": "active"},
+            {"cached_title": 1, "cached_username": 1, "cache_updated_at": 1}
+        )
+        if channel and "cached_title" in channel:
+            # Return cached info if it's less than 24 hours old
+            cache_age = datetime.utcnow() - channel.get("cache_updated_at", datetime.min)
+            if cache_age.total_seconds() < 86400:  # 24 hours
+                return {
+                    "title": channel["cached_title"],
+                    "username": channel.get("cached_username")
+                }
+        return None
+    except Exception as e:
+        print(f"Error fetching cached channel info for {channel_id}: {e}")
         return None
 
 async def set_approval_off(channel_id: int, off: bool = True) -> bool:
