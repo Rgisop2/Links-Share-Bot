@@ -81,11 +81,18 @@ async def start_command(client: Bot, message: Message):
             from database.database import get_original_link
             original_link = await get_original_link(channel_id)
             if original_link:
+                try:
+                    chat = await client.get_chat(channel_id)
+                    channel_title = chat.title
+                    genlink_text = f"<b><blockquote expandable>ʜᴇʀᴇ ɪs ʏᴏᴜʀ ʟɪɴᴋ! {channel_title} ᴄʟɪᴄᴋ ʙᴇʟᴏᴡ ᴛᴏ ᴘʀᴏᴄᴇᴇᴅ</b>"
+                except Exception as e:
+                    print(f"Error getting channel title for genlink: {e}")
+                    genlink_text = "<b><blockquote expandable>ʜᴇʀᴇ ɪs ʏᴏᴜʀ ʟɪɴᴋ! ᴄʟɪᴄᴋ ʙᴇʟᴏᴡ ᴛᴏ ᴘʀᴏᴄᴇᴇᴅ</b>"
                 button = InlineKeyboardMarkup(
                     [[InlineKeyboardButton("• Proceed to Link •", url=original_link)]]
                 )
                 return await message.reply_text(
-                    "<b><blockquote expandable>ʜᴇʀᴇ ɪs ʏᴏᴜʀ ʟɪɴᴋ! ᴄʟɪᴄᴋ ʙᴇʟᴏᴡ ᴛᴏ ᴘʀᴏᴄᴇᴇᴅ</b>",
+                    genlink_text,
                     reply_markup=button,
                     parse_mode=ParseMode.HTML
                 )
@@ -184,16 +191,29 @@ async def start_command(client: Bot, message: Message):
                     )
                 except Exception as e:
                     print(f"Error sending photo message: {e}")
+                    try:
+                        chat = await client.get_chat(channel_id)
+                        channel_title = chat.title
+                        fallback_text = f"<b><blockquote expandable>ʜᴇʀᴇ ɪs ʏᴏᴜʀ ʟɪɴᴋ! {channel_title} ᴄʟɪᴄᴋ ʙᴇʟᴏᴡ ᴛᴏ ᴘʀᴏᴄᴇᴇᴅ</b>"
+                    except:
+                        fallback_text = "<b><blockquote expandable>ʜᴇʀᴇ ɪs ʏᴏᴜʀ ʟɪɴᴋ! ᴄʟɪᴄᴋ ʙᴇʟᴏᴡ ᴛᴏ ᴘʀᴏᴄᴇᴇᴅ</b>"
                     # Fallback to text message if photo fails
                     await message.reply_text(
-                        "<b><blockquote expandable>ʜᴇʀᴇ ɪs ʏᴏᴜʀ ʟɪɴᴋ! ᴄʟɪᴄᴋ ʙᴇʟᴏᴡ ᴛᴏ ᴘʀᴏᴄᴇᴇᴅ</b>",
+                        fallback_text,
                         reply_markup=button,
                         parse_mode=ParseMode.HTML
                     )
             else:
+                try:
+                    chat = await client.get_chat(channel_id)
+                    channel_title = chat.title
+                    text_message = f"<b><blockquote expandable>ʜᴇʀᴇ ɪs ʏᴏᴜʀ ʟɪɴᴋ! {channel_title} ᴄʟɪᴄᴋ ʙᴇʟᴏᴡ ᴛᴏ ᴘʀᴏᴄᴇᴇᴅ</b>"
+                except Exception as e:
+                    print(f"Error getting channel title: {e}")
+                    text_message = "<b><blockquote expandable>ʜᴇʀᴇ ɪs ʏᴏᴜʀ ʟɪɴᴋ! ᴄʟɪᴄᴋ ʙᴇʟᴏᴡ ᴛᴏ ᴘʀᴏᴄᴇᴇᴅ</b>"
                 # Original text message behavior
                 await message.reply_text(
-                    "<b><blockquote expandable>ʜᴇʀᴇ ɪs ʏᴏᴜʀ ʟɪɴᴋ! ᴄʟɪᴄᴋ ʙᴇʟᴏᴡ ᴛᴏ ᴘʀᴏᴄᴇᴇᴅ</b>",
+                    text_message,
                     reply_markup=button,
                     parse_mode=ParseMode.HTML
                 )
