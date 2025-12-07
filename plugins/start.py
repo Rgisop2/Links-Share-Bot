@@ -77,6 +77,8 @@ async def start_command(client: Bot, message: Message):
                     parse_mode=ParseMode.HTML
                 )
 
+            await client.send_chat_action(message.chat.id, ChatAction.TYPING)
+
             # Check if this is a /genlink link (original_link exists)
             from database.database import get_original_link
             original_link = await get_original_link(channel_id)
@@ -99,8 +101,33 @@ async def start_command(client: Bot, message: Message):
 
             # Use a lock for this channel to prevent concurrent link generation
             async with channel_locks[channel_id]:
-                # Check if we already have a valid link
-                old_link_info = await get_current_invite_link(channel_id)
+                chat_task = client.get_chat(channel_id)
+                old_link_info_task = get_current_invite_link(channel_id)
+                photo_task = get_channel_photo(channel_id)
+                
+                # Await all tasks concurrently
+                chat, old_link_info, photo_link = await asyncio.gather(
+                    chat_task, 
+                    old_link_info_task, 
+                    photo_task,
+                    return_exceptions=True
+                )
+                
+                # Handle exceptions from gather
+                if isinstance(chat, Exception):
+                    print(f"Error fetching chat info: {chat}")
+                    chat = None
+                if isinstance(old_link_info, Exception):
+                    print(f"Error fetching old link info: {old_link_info}")
+                    old_link_info = None
+                if isinstance(photo_link, Exception):
+                    print(f"Error fetching photo link: {photo_link}")
+                    photo_link = None
+                
+                # Get channel title early
+                channel_title = chat.title if chat else "Channel"
+                channel_username = f"@{chat.username}" if (chat and chat.username) else ""
+                
                 current_time = datetime.now()
                 
                 # If we have an existing link and it's not expired yet (assuming 5 minutes validity)
@@ -138,93 +165,48 @@ async def start_command(client: Bot, message: Message):
                     is_request_link = is_request
                     await save_invite_link(channel_id, invite_link, is_request_link)
 
-            from database.database import get_channel_photo
-            photo_link = await get_channel_photo(channel_id)
-            
             button_text = "• ʀᴇǫᴜᴇsᴛ ᴛᴏ ᴊᴏɪɴ •" if is_request_link else "• ᴊᴏɪɴ ᴄʜᴀɴɴᴇʟ •"
             button = InlineKeyboardMarkup([[InlineKeyboardButton(button_text, url=invite_link)]])
-
-            wait_msg = await message.reply_text(
-                "⏳",
-                parse_mode=ParseMode.HTML
-            )
-            
-            await wait_msg.delete()
             
             if photo_link:
-                # Get channel info for title
-                try:
-                    chat = await client.get_chat(channel_id)
-                    channel_title = chat.title
-                    channel_username = f"@{chat.username}" if chat.username else ""
+                # Remove "Hindi" from end of title if present
+                if channel_title.endswith(" Hindi"):
+                    channel_title = channel_title[:-6].strip()
                     
-                    # Remove "Hindi" from end of title if present
-                    if channel_title.endswith(" Hindi"):
-                        channel_title = channel_title[:-6].strip()
-                    
-                    # Calculate expiration time (10 minutes)
-                    expire_seconds = 600
-                    
-                    # Escape special characters for MarkdownV2
-                    def escape_markdown(text):
-                        special_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
-                        for char in special_chars:
-                            text = text.replace(char, f'\\{char}')
-                        return text
-                    
-                    escaped_title = escape_markdown(channel_title)
-                    escaped_username = escape_markdown(channel_username)
-                    escaped_photo_link = photo_link  # URL doesn't need escaping in MarkdownV2
-                    
-                    caption = (
+                # Calculate expiration time (10 minutes)
+                expire_seconds = 600
+                
+                # Escape special characters for MarkdownV2
+                def escape_markdown(text):
+                    special_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+                    for char in special_chars:
+                        text = text.replace(char, f'\\{char}')
+                    return text
+                
+                escaped_title = escape_markdown(channel_title)
+                escaped_username = escape_markdown(channel_username)
+                escaped_photo_link = photo_link  # URL doesn't need escaping in MarkdownV2
+                
+                caption = (
     f"<b>{escaped_title}</b>\n"
     f"{escaped_username}"
     f"<blockquote>• Audio: Hindi\n• Quality: 480p + 720p + 1080p</blockquote>\n\n"
     f"This link will expire in {expire_seconds} seconds."
                     )
                     
-                    await message.reply_photo(
-                        photo=photo_link,
-                        caption=caption,
-                        reply_markup=button,
-                        parse_mode=ParseMode.HTML
-                    )
-                except Exception as e:
-                    print(f"Error sending photo message: {e}")
-                    try:
-                        chat = await client.get_chat(channel_id)
-                        channel_title = chat.title
-                        fallback_text = f"<b><blockquote expandable>ʜᴇʀᴇ ɪs ʏᴏᴜʀ ʟɪɴᴋ! {channel_title} ᴄʟɪᴄᴋ ʙᴇʟᴏᴡ ᴛᴏ ᴘʀᴏᴄᴇᴇᴅ</b>"
-                    except:
-                        fallback_text = "<b><blockquote expandable>ʜᴇʀᴇ ɪs ʏᴏᴜʀ ʟɪɴᴋ! ᴄʟɪᴄᴋ ʙᴇʟᴏᴡ ᴛᴏ ᴘʀᴏᴄᴇᴇᴅ</b>"
-                    # Fallback to text message if photo fails
-                    await message.reply_text(
-                        fallback_text,
-                        reply_markup=button,
-                        parse_mode=ParseMode.HTML
-                    )
+                await message.reply_photo(
+                    photo=photo_link,
+                    caption=caption,
+                    reply_markup=button,
+                    parse_mode=ParseMode.HTML
+                )
             else:
-                try:
-                    chat = await client.get_chat(channel_id)
-                    channel_title = chat.title
-                    text_message = f"<b><blockquote expandable>ʜᴇʀᴇ ɪs ʏᴏᴜʀ ʟɪɴᴋ! {channel_title} ᴄʟɪᴄᴋ ʙᴇʟᴏᴡ ᴛᴏ ᴘʀᴏᴄᴇᴇᴅ</b>"
-                except Exception as e:
-                    print(f"Error getting channel title: {e}")
-                    text_message = "<b><blockquote expandable>ʜᴇʀᴇ ɪs ʏᴏᴜʀ ʟɪɴᴋ! ᴄʟɪᴄᴋ ʙᴇʟᴏᴡ ᴛᴏ ᴘʀᴏᴄᴇᴇᴅ</b>"
-                # Original text message behavior
+                text_message = f"<b><blockquote expandable>ʜᴇʀᴇ ɪs ʏᴏᴜʀ ʟɪɴᴋ! {channel_title} ᴄʟɪᴄᴋ ʙᴇʟᴏᴡ ᴛᴏ ᴘʀᴏᴄᴇᴇᴅ</b>"
                 await message.reply_text(
                     text_message,
                     reply_markup=button,
                     parse_mode=ParseMode.HTML
                 )
-
-            if not photo_link:
-                note_msg = await message.reply_text(
-                    "<u><b>Note: If the link is expired, please click the post link again to get a new one.</b></u>",
-                    parse_mode=ParseMode.HTML
-                )
-                # Auto-delete the note message after 5 minutes
-                asyncio.create_task(delete_after_delay(note_msg, 300))
 
             asyncio.create_task(revoke_invite_after_5_minutes(client, channel_id, invite_link, is_request_link))
 
