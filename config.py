@@ -30,7 +30,7 @@ PORT = safe_int(os.environ.get("PORT", "8080"), default=8080, varname="PORT")
 # ---------- DATABASE ----------
 DB_URI = os.environ.get(
     "DB_URI",
-    "mongodb+srv://rj5706603:O95nvJYxapyDHfkw@cluster0.fzmckei.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+    "mongodb+srv://ruhan:ruhan@isrg.bzrvwbh.mongodb.net/?retryWrites=true&w=majority&appName=isrg"
 )
 DB_NAME = os.environ.get("DB_NAME", "linkchange")
 
