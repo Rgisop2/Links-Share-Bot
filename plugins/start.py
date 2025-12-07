@@ -1,3 +1,4 @@
+
 import asyncio
 import base64
 import time
@@ -42,23 +43,6 @@ async def start_command(client: Bot, message: Message):
             
     await add_user(user_id)
 
-   # ✅ Check Force Subscription
-    #if not await is_subscribed(client, user_id):
-        #await temp.delete()
-        #return await not_joined(client, message)
-
-# 
-    # Check FSub requirements
-   #  fsub_channels = await get_fsub_channels()
-   #  if fsub_channels:
-    #     is_subscribed, subscription_message, subscription_buttons = await check_subscription_status(client, user_id, fsub_channels)
-   #      if not is_subscribed:
-    #         return await message.reply_text(
-    #             subscription_message,
-    #             reply_markup=subscription_buttons,
-    #             parse_mode=ParseMode.HTML
-     #        )
-
     text = message.text
     if len(text) > 7:
         try:
@@ -77,6 +61,19 @@ async def start_command(client: Bot, message: Message):
                     parse_mode=ParseMode.HTML
                 )
 
+            # Get channel info for title
+            try:
+                chat = await client.get_chat(channel_id)
+                channel_title = chat.title
+                # Remove "Hindi" from end of title if present
+                if channel_title.endswith(" Hindi"):
+                    channel_title = channel_title[:-6].strip()
+            except Exception as e:
+                print(f"Error getting channel title for {channel_id}: {e}")
+                channel_title = "the channel" # Fallback title
+
+            response_text = f"Here is your link for {channel_title}. Click below to proceed."
+
             # Check if this is a /genlink link (original_link exists)
             from database.database import get_original_link
             original_link = await get_original_link(channel_id)
@@ -85,7 +82,7 @@ async def start_command(client: Bot, message: Message):
                     [[InlineKeyboardButton("• Proceed to Link •", url=original_link)]]
                 )
                 return await message.reply_text(
-                    "<b><blockquote expandable>ʜᴇʀᴇ ɪs ʏᴏᴜʀ ʟɪɴᴋ! ᴄʟɪᴄᴋ ʙᴇʟᴏᴡ ᴛᴏ ᴘʀᴏᴄᴇᴇᴅ</b>",
+                    response_text,
                     reply_markup=button,
                     parse_mode=ParseMode.HTML
                 )
@@ -145,40 +142,10 @@ async def start_command(client: Bot, message: Message):
             await wait_msg.delete()
             
             if photo_link:
-                # Get channel info for title
                 try:
-                    chat = await client.get_chat(channel_id)
-                    channel_title = chat.title
-                    channel_username = f"@{chat.username}" if chat.username else ""
-                    
-                    # Remove "Hindi" from end of title if present
-                    if channel_title.endswith(" Hindi"):
-                        channel_title = channel_title[:-6].strip()
-                    
-                    # Calculate expiration time (10 minutes)
-                    expire_seconds = 600
-                    
-                    # Escape special characters for MarkdownV2
-                    def escape_markdown(text):
-                        special_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
-                        for char in special_chars:
-                            text = text.replace(char, f'\\{char}')
-                        return text
-                    
-                    escaped_title = escape_markdown(channel_title)
-                    escaped_username = escape_markdown(channel_username)
-                    escaped_photo_link = photo_link  # URL doesn't need escaping in MarkdownV2
-                    
-                    caption = (
-    f"<b>{escaped_title}</b>\n"
-    f"{escaped_username}"
-    f"<blockquote>• Audio: Hindi\n• Quality: 480p + 720p + 1080p</blockquote>\n\n"
-    f"This link will expire in {expire_seconds} seconds."
-                    )
-                    
                     await message.reply_photo(
                         photo=photo_link,
-                        caption=caption,
+                        caption=response_text,
                         reply_markup=button,
                         parse_mode=ParseMode.HTML
                     )
@@ -186,25 +153,17 @@ async def start_command(client: Bot, message: Message):
                     print(f"Error sending photo message: {e}")
                     # Fallback to text message if photo fails
                     await message.reply_text(
-                        "<b><blockquote expandable>ʜᴇʀᴇ ɪs ʏᴏᴜʀ ʟɪɴᴋ! ᴄʟɪᴄᴋ ʙᴇʟᴏᴡ ᴛᴏ ᴘʀᴏᴄᴇᴇᴅ</b>",
+                        response_text,
                         reply_markup=button,
                         parse_mode=ParseMode.HTML
                     )
             else:
                 # Original text message behavior
                 await message.reply_text(
-                    "<b><blockquote expandable>ʜᴇʀᴇ ɪs ʏᴏᴜʀ ʟɪɴᴋ! ᴄʟɪᴄᴋ ʙᴇʟᴏᴡ ᴛᴏ ᴘʀᴏᴄᴇᴇᴅ</b>",
+                    response_text,
                     reply_markup=button,
                     parse_mode=ParseMode.HTML
                 )
-
-            if not photo_link:
-                note_msg = await message.reply_text(
-                    "<u><b>Note: If the link is expired, please click the post link again to get a new one.</b></u>",
-                    parse_mode=ParseMode.HTML
-                )
-                # Auto-delete the note message after 5 minutes
-                asyncio.create_task(delete_after_delay(note_msg, 300))
 
             asyncio.create_task(revoke_invite_after_5_minutes(client, channel_id, invite_link, is_request_link))
 
@@ -263,462 +222,130 @@ async def get_link_creation_time(channel_id):
 # Create a global dictionary to store chat data
 chat_data_cache = {}
 
-async def not_joined(client: Client, message: Message):
-    #temp = await message.reply("<b><i>ᴡᴀɪᴛ ᴀ sᴇᴄ..</i></b>")
-
-    user_id = message.from_user.id
-    buttons = []
-    count = 0
-
+async def get_chat_data(client, chat_id):
+    if chat_id in chat_data_cache:
+        return chat_data_cache[chat_id]
+    
     try:
-        all_channels = await db.show_channels()  # Should return list of (chat_id, mode) tuples
-        for total, chat_id in enumerate(all_channels, start=1):
-            mode = await db.get_channel_mode(chat_id)  # fetch mode 
-
-            await message.reply_chat_action(ChatAction.TYPING)
-
-            if not await is_sub(client, user_id, chat_id):
-                try:
-                    # Cache chat info
-                    if chat_id in chat_data_cache:
-                        data = chat_data_cache[chat_id]
-                    else:
-                        data = await client.get_chat(chat_id)
-                        chat_data_cache[chat_id] = data
-
-                    name = data.title
-
-                    # Generate proper invite link based on the mode
-                    if mode == "on" and not data.username:
-                        invite = await client.create_chat_invite_link(
-                            chat_id=chat_id,
-                            creates_join_request=True,
-                            expire_date=datetime.utcnow() + timedelta(seconds=FSUB_LINK_EXPIRY) if FSUB_LINK_EXPIRY else None
-                            )
-                        link = invite.invite_link
-
-                    else:
-                        if data.username:
-                            link = f"https://t.me/{data.username}"
-                        else:
-                            invite = await client.create_chat_invite_link(
-                                chat_id=chat_id,
-                                expire_date=datetime.utcnow() + timedelta(seconds=FSUB_LINK_EXPIRY) if FSUB_LINK_EXPIRY else None)
-                            link = invite.invite_link
-
-                    buttons.append([InlineKeyboardButton(text=name, url=link)])
-                    count += 1
-                    #await temp.edit(f"<b>{'! ' * count}</b>")
-
-                except Exception as e:
-                    print(f"Error with chat {chat_id}: {e}")
-                    return #await temp.edit(
-                        #f"<b><i>! Eʀʀᴏʀ, Cᴏɴᴛᴀᴄᴛ ᴅᴇᴠᴇʟᴏᴘᴇʀ ᴛᴏ sᴏʟᴠᴇ ᴛʜᴇ ɪssᴜᴇs @rohit_1888</i></b>\n"
-                        #f"<blockquote expandable><b>Rᴇᴀsᴏɴ:</b> {e}</blockquote>"
-                    #)
-
-        # Retry Button
-        try:
-            buttons.append([
-                InlineKeyboardButton(
-                    text='♻️ Tʀʏ Aɢᴀɪɴ',
-                    url=f"https://t.me/{client.username}?start={message.command[1]}"
-                )
-            ])
-        except IndexError:
-            pass
-
-        await message.reply_photo(
-            photo=FORCE_PIC,
-            caption=FORCE_MSG.format(
-                first=message.from_user.first_name,
-                last=message.from_user.last_name,
-                username=None if not message.from_user.username else '@' + message.from_user.username,
-                mention=message.from_user.mention,
-                id=message.from_user.id
-            ),
-            reply_markup=InlineKeyboardMarkup(buttons),
-        )
-
+        chat = await client.get_chat(chat_id)
+        chat_data_cache[chat_id] = chat
+        return chat
     except Exception as e:
-        print(f"Final Error: {e}")
+        print(f"Error fetching chat data for {chat_id}: {e}")
+        return None
 
-@Bot.on_callback_query(filters.regex("close"))
-async def close_callback(client: Bot, callback_query):
-    await callback_query.answer()
-    await callback_query.message.delete()
-
-@Bot.on_callback_query(filters.regex("check_sub"))
-async def check_sub_callback(client: Bot, callback_query: CallbackQuery):
-    user_id = callback_query.from_user.id
+async def not_joined(client, message):
+    buttons = []
+    
     fsub_channels = await get_fsub_channels()
+    if fsub_channels:
+        for channel_id in fsub_channels:
+            chat = await get_chat_data(client, channel_id)
+            if chat:
+                buttons.append([InlineKeyboardButton(chat.title, url=chat.invite_link)])
     
+    if buttons:
+        await message.reply_text(
+            "<b><blockquote expandable>You must join our channel(s) to use this bot.</b>",
+            reply_markup=InlineKeyboardMarkup(buttons),
+            parse_mode=ParseMode.HTML
+        )
+
+async def is_subscribed(client, user_id):
+    fsub_channels = await get_fsub_channels()
     if not fsub_channels:
-        await callback_query.message.edit_text(
-            "<b>No FSub channels configured!</b>",
-            parse_mode=ParseMode.HTML
-        )
-        return
-    
-    is_subscribed, subscription_message, subscription_buttons = await check_subscription_status(client, user_id, fsub_channels)
-    if is_subscribed:
-        await callback_query.message.edit_text(
-            "<b>You are subscribed to all required channels! Use /start to proceed.</b>",
-            parse_mode=ParseMode.HTML
-        )
-    else:
-        await callback_query.message.edit_text(
-            subscription_message,
-            reply_markup=subscription_buttons,
-            parse_mode=ParseMode.HTML
-        )
+        return True
 
-WAIT_MSG = "<b>Processing...</b>"
-
-REPLY_ERROR = """Usᴇ ᴛʜɪs ᴄᴏᴍᴍᴀɴᴅ ᴀs ᴀ ʀᴇᴘʟʏ ᴛᴏ ᴀɴʏ Tᴇʟᴇɢʀᴀᴍ ᴍᴇssᴀɢᴇ ᴡɪᴛʜᴏᴜᴛ ᴀɴʏ sᴘᴀᴄᴇs."""
-# Define a global variable to store the cancel state
-is_canceled = False
-cancel_lock = Lock()
-
-@Bot.on_message(filters.command('status') & filters.private & is_owner_or_admin)
-async def info(client: Bot, message: Message):   
-    reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("• Close •", callback_data="close")]])
-    
-    start_time = time.time()
-    temp_msg = await message.reply("<b><i>Processing...</i></b>", quote=True, parse_mode=ParseMode.HTML)
-    end_time = time.time()
-    
-    ping_time = (end_time - start_time) * 1000
-    
-    users = await full_userbase()
-    now = datetime.now()
-    delta = now - client.uptime
-    bottime = get_readable_time(delta.seconds)
-    
-    await temp_msg.edit(
-        f"<b>Users: {len(users)}\n\nUptime: {bottime}\n\nPing: {ping_time:.2f} ms</b>",
-        reply_markup=reply_markup,
-        parse_mode=ParseMode.HTML
-    )
-
-#--------------------------------------------------------------[[ADMIN COMMANDS]]---------------------------------------------------------------------------#
-# Handler for the /cancel command
-@Bot.on_message(filters.command('cancel') & filters.private & is_owner_or_admin)
-async def cancel_broadcast(client: Bot, message: Message):
-    global is_canceled
-    async with cancel_lock:
-        is_canceled = True
-
-@Bot.on_message(filters.private & filters.command('broadcast') & is_owner_or_admin)
-async def broadcast(client: Bot, message: Message):
-    global is_canceled
-    args = message.text.split()[1:]
-
-    if not message.reply_to_message:
-        msg = await message.reply(
-            "Reply to a message to broadcast.\n\nUsage examples:\n"
-            "`/broadcast normal`\n"
-            "`/broadcast pin`\n"
-            "`/broadcast delete 30`\n"
-            "`/broadcast pin delete 30`\n"
-            "`/broadcast silent`\n"
-        )
-        await asyncio.sleep(8)
-        return await msg.delete()
-
-    # Defaults
-    do_pin = False
-    do_delete = False
-    duration = 0
-    silent = False
-    mode_text = []
-
-    i = 0
-    while i < len(args):
-        arg = args[i].lower()
-        if arg == "pin":
-            do_pin = True
-            mode_text.append("PIN")
-        elif arg == "delete":
-            do_delete = True
-            try:
-                duration = int(args[i + 1])
-                i += 1
-            except (IndexError, ValueError):
-                return await message.reply("<b>Provide valid duration for delete mode.</b>\nUsage: `/broadcast delete 30`")
-            mode_text.append(f"DELETE({duration}s)")
-        elif arg == "silent":
-            silent = True
-            mode_text.append("SILENT")
-        else:
-            mode_text.append(arg.upper())
-        i += 1
-
-    if not mode_text:
-        mode_text.append("NORMAL")
-
-    # Reset cancel flag
-    async with cancel_lock:
-        is_canceled = False
-
-    query = await full_userbase()
-    broadcast_msg = message.reply_to_message
-    total = len(query)
-    successful = blocked = deleted = unsuccessful = 0
-
-    pls_wait = await message.reply(f"<i>Broadcasting in <b>{' + '.join(mode_text)}</b> mode...</i>")
-
-    bar_length = 20
-    progress_bar = ''
-    last_update_percentage = 0
-    update_interval = 0.05  # 5%
-
-    for i, chat_id in enumerate(query, start=1):
-        async with cancel_lock:
-            if is_canceled:
-                await pls_wait.edit(f"›› BROADCAST ({' + '.join(mode_text)}) CANCELED ❌")
-                return
-
+    for channel_id in fsub_channels:
         try:
-            sent_msg = await broadcast_msg.copy(chat_id, disable_notification=silent)
+            member = await client.get_chat_member(chat_id=channel_id, user_id=user_id)
+            if member.status not in [ChatMemberStatus.BANNED, ChatMemberStatus.LEFT]:
+                continue
+        except UserNotParticipant:
+            pass
+        return False
+    return True
 
-            if do_pin:
-                await client.pin_chat_message(chat_id, sent_msg.id, both_sides=True)
-            if do_delete:
-                asyncio.create_task(auto_delete(sent_msg, duration))
+async def check_subscription_status(client, user_id, fsub_channels):
+    is_subscribed = True
+    subscription_message = "<b><blockquote expandable>You must join our channel(s) to use this bot.</b>"
+    subscription_buttons = []
 
-            successful += 1
-        except FloodWait as e:
-            await asyncio.sleep(e.x)
+    for channel_id in fsub_channels:
+        try:
+            member = await client.get_chat_member(chat_id=channel_id, user_id=user_id)
+            if member.status in [ChatMemberStatus.BANNED, ChatMemberStatus.LEFT]:
+                is_subscribed = False
+        except UserNotParticipant:
+            is_subscribed = False
+        
+        if not is_subscribed:
             try:
-                sent_msg = await broadcast_msg.copy(chat_id, disable_notification=silent)
-                if do_pin:
-                    await client.pin_chat_message(chat_id, sent_msg.id, both_sides=True)
-                if do_delete:
-                    asyncio.create_task(auto_delete(sent_msg, duration))
-                successful += 1
-            except:
-                unsuccessful += 1
-        except UserIsBlocked:
-            await del_user(chat_id)
-            blocked += 1
-        except InputUserDeactivated:
-            await del_user(chat_id)
-            deleted += 1
-        except:
-            unsuccessful += 1
-            await del_user(chat_id)
+                chat = await client.get_chat(channel_id)
+                if chat.invite_link:
+                    subscription_buttons.append([InlineKeyboardButton(chat.title, url=chat.invite_link)])
+            except Exception as e:
+                print(f"Error getting chat info for fsub channel {channel_id}: {e}")
 
-        # Progress
-        percent_complete = i / total
-        if percent_complete - last_update_percentage >= update_interval or last_update_percentage == 0:
-            num_blocks = int(percent_complete * bar_length)
-            progress_bar = "●" * num_blocks + "○" * (bar_length - num_blocks)
-            status_update = f"""<b>›› BROADCAST ({' + '.join(mode_text)}) IN PROGRESS...
-
-<blockquote>⏳:</b> [{progress_bar}] <code>{percent_complete:.0%}</code></blockquote>
-
-<b>›› Total Users: <code>{total}</code>
-›› Successful: <code>{successful}</code>
-›› Blocked: <code>{blocked}</code>
-›› Deleted: <code>{deleted}</code>
-›› Unsuccessful: <code>{unsuccessful}</code></b>
-
-<i>➪ To stop broadcasting click: <b>/cancel</b></i>"""
-            await pls_wait.edit(status_update)
-            last_update_percentage = percent_complete
-
-    # Final status
-    final_status = f"""<b>›› BROADCAST ({' + '.join(mode_text)}) COMPLETED ✅
-
-<blockquote>Dᴏɴᴇ:</b> [{progress_bar}] {percent_complete:.0%}</blockquote>
-
-<b>›› Total Users: <code>{total}</code>
-›› Successful: <code>{successful}</code>
-›› Blocked: <code>{blocked}</code>
-›› Deleted: <code>{deleted}</code>
-›› Unsuccessful: <code>{unsuccessful}</code></b>"""
-    return await pls_wait.edit(final_status)
-
-
-# helper for delete mode
-async def auto_delete(sent_msg, duration):
-    await asyncio.sleep(duration)
-    try:
-        await sent_msg.delete()
-    except:
-        pass
-
-
-#----------------------------------
-
-user_message_count = {}
-user_banned_until = {}
-
-MAX_MESSAGES = 3
-TIME_WINDOW = timedelta(seconds=10)
-BAN_DURATION = timedelta(hours=1)
-
-"""
-
-@Bot.on_message(filters.private)
-async def monitor_messages(client: Bot, message: Message):
-    user_id = message.from_user.id
-    now = datetime.now()
-
-    if message.text and message.text.startswith("/"):
-        return
-
-    if user_id in ADMINS:
-        return 
-
-    if user_id in user_banned_until and now < user_banned_until[user_id]:
-        await message.reply_text(
-            "<b><blockquote expandable>You are temporarily banned from using commands due to spamming. Try again later.</b>",
-            parse_mode=ParseMode.HTML
-        )
-        return
-
-    if user_id not in user_message_count:
-        user_message_count[user_id] = []
-
-    user_message_count[user_id].append(now)
-    user_message_count[user_id] = [time for time in user_message_count[user_id] if now - time <= TIME_WINDOW]
-
-    if len(user_message_count[user_id]) > MAX_MESSAGES:
-        user_banned_until[user_id] = now + BAN_DURATION
-        await message.reply_text(
-            "<b><blockquote expandable>You are temporarily banned from using commands due to spamming. Try again later.</b>",
-            parse_mode=ParseMode.HTML
-        )
-        return
-
-"""
+    return is_subscribed, subscription_message, InlineKeyboardMarkup(subscription_buttons) if subscription_buttons else None
 
 @Bot.on_callback_query()
 async def cb_handler(client: Bot, query: CallbackQuery):
-    data = query.data  
-    chat_id = query.message.chat.id
-    
-    if data == "close":
+    user_id = query.from_user.id
+
+    if query.data == "close":
         await query.message.delete()
-        try:
-            await query.message.reply_to_message.delete()
-        except:
-            pass
-    
-    elif data == "about":
-        user = await client.get_users(OWNER_ID)
-        user_link = f"https://t.me/{user.username}" if user.username else f"tg://openmessage?user_id={OWNER_ID}"
-        
-        await query.edit_message_media(
-            InputMediaPhoto(
-                "https://envs.sh/Wdj.jpg",
-                ABOUT_TXT
-            ),
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton('• ʙᴀᴄᴋ', callback_data='start'), InlineKeyboardButton('ᴄʟᴏsᴇ •', callback_data='close')]
-            ]),
+
+    elif query.data == "about":
+        await query.answer(
+            "Bot by @Codeflix_Bots\n\n"            "Contact @CodeflixSupport for help.",
+            show_alert=True
         )
 
-    elif data == "channels":
-        user = await client.get_users(OWNER_ID)
-        user_link = f"https://t.me/{user.username}" if user.username else f"tg://openmessage?user_id={OWNER_ID}" 
-        ownername = f"<a href={user_link}>{user.first_name}</a>" if user.first_name else f"<a href={user_link}>no name !</a>"
-        await query.edit_message_media(
-            InputMediaPhoto("https://envs.sh/Wdj.jpg", 
-                            CHANNELS_TXT
-            ),
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton('• ʙᴀᴄᴋ', callback_data='start'), InlineKeyboardButton('home•', callback_data='setting')]
-            ]),
-        )
-    elif data in ["start", "home"]:
-        inline_buttons = InlineKeyboardMarkup(
-            [
-                [InlineKeyboardButton("• ᴀʙᴏᴜᴛ", callback_data="about"),
-                 InlineKeyboardButton("• ᴄʜᴀɴɴᴇʟs", callback_data="channels")],
-                [InlineKeyboardButton("• Close •", callback_data="close")]
-            ]
-        )
-        try:
-            await query.edit_message_media(
-                InputMediaPhoto(
-                    START_PIC,
-                    START_MSG
-                ),
-                reply_markup=inline_buttons
-            )
-        except Exception as e:
-            print(f"Error sending start/home photo: {e}")
-            await query.edit_message_text(
-                START_MSG,
-                reply_markup=inline_buttons,
-                parse_mode=ParseMode.HTML
-            )
+    elif query.data == "channels":
+        fsub_channels = await get_fsub_channels()
+        if not fsub_channels:
+            return await query.answer("No channels configured.", show_alert=True)
 
-
-    elif data.startswith("rfs_ch_"):
-        cid = int(data.split("_")[2])
-        try:
-            chat = await client.get_chat(cid)
-            mode = await db.get_channel_mode(cid)
-            status = "🟢 ᴏɴ" if mode == "on" else "🔴 ᴏғғ"
-            new_mode = "ᴏғғ" if mode == "on" else "on"
-            buttons = [
-                [InlineKeyboardButton(f"ʀᴇǫ ᴍᴏᴅᴇ {'OFF' if mode == 'on' else 'ON'}", callback_data=f"rfs_toggle_{cid}_{new_mode}")],
-                [InlineKeyboardButton("‹ ʙᴀᴄᴋ", callback_data="fsub_back")]
-            ]
-            await query.message.edit_text(
-                f"Channel: {chat.title}\nCurrent Force-Sub Mode: {status}",
-                reply_markup=InlineKeyboardMarkup(buttons)
-            )
-        except Exception:
-            await query.answer("Failed to fetch channel info", show_alert=True)
-
-    elif data.startswith("rfs_toggle_"):
-        cid, action = data.split("_")[2:]
-        cid = int(cid)
-        mode = "on" if action == "on" else "off"
-
-        await db.set_channel_mode(cid, mode)
-        await query.answer(f"Force-Sub set to {'ON' if mode == 'on' else 'OFF'}")
-
-        # Refresh the same channel's mode view
-        chat = await client.get_chat(cid)
-        status = "🟢 ON" if mode == "on" else "🔴 OFF"
-        new_mode = "off" if mode == "on" else "on"
-        buttons = [
-            [InlineKeyboardButton(f"ʀᴇǫ ᴍᴏᴅᴇ {'OFF' if mode == 'on' else 'ON'}", callback_data=f"rfs_toggle_{cid}_{new_mode}")],
-            [InlineKeyboardButton("‹ ʙᴀᴄᴋ", callback_data="fsub_back")]
-        ]
-        await query.message.edit_text(
-            f"Channel: {chat.title}\nCurrent Force-Sub Mode: {status}",
-            reply_markup=InlineKeyboardMarkup(buttons)
-        )
-
-    elif data == "fsub_back":
-        channels = await db.show_channels()
         buttons = []
-        for cid in channels:
-            try:
-                chat = await client.get_chat(cid)
-                mode = await db.get_channel_mode(cid)
-                status = "🟢" if mode == "on" else "🔴"
-                buttons.append([InlineKeyboardButton(f"{status} {chat.title}", callback_data=f"rfs_ch_{cid}")])
-            except:
-                continue
+        for channel_id in fsub_channels:
+            chat = await get_chat_data(client, channel_id)
+            if chat:
+                buttons.append([InlineKeyboardButton(chat.title, url=chat.invite_link)])
+        
+        if buttons:
+            await query.message.edit_reply_markup(InlineKeyboardMarkup(buttons))
+        else:
+            await query.answer("Could not fetch channel information.", show_alert=True)
 
-        await query.message.edit_text(
-            "sᴇʟᴇᴄᴛ ᴀ ᴄʜᴀɴɴᴇʟ ᴛᴏ ᴛᴏɢɢʟᴇ ɪᴛs ғᴏʀᴄᴇ-sᴜʙ ᴍᴏᴅᴇ:",
-            reply_markup=InlineKeyboardMarkup(buttons)
-        )
+    elif query.data.startswith("ban_"): 
+        try: 
+            user_id = int(query.data.split("_")[1])
+            await client.ban_chat_member(BANNED_CHANNEL, user_id)
+            await query.answer("User Banned", show_alert=True)
+        except Exception as e:
+            await query.answer(f"Error: {e}", show_alert=True)
 
-def delete_after_delay(msg, delay):
-    async def inner():
-        await asyncio.sleep(delay)
+    elif query.data.startswith("unban_"):
         try:
-            await msg.delete()
-        except:
-            pass
-    return inner()
+            user_id = int(query.data.split("_")[1])
+            await client.unban_chat_member(BANNED_CHANNEL, user_id)
+            await query.answer("User Unbanned", show_alert=True)
+        except Exception as e:
+            await query.answer(f"Error: {e}", show_alert=True)
+
+#=====================================================================================##
+# Don't Remove Credit @CodeFlix_Bots, @rohit_1888
+# Ask Doubt on telegram @CodeflixSupport
+
+async def delete_after_delay(message, delay):
+    await asyncio.sleep(delay)
+    try:
+        await message.delete()
+    except Exception as e:
+        print(f"Error deleting message: {e}")
+
+#=====================================================================================##
+# Don't Remove Credit @CodeFlix_Bots, @rohit_1888
+# Ask Doubt on telegram @CodeflixSupport
+'''
